@@ -12,7 +12,8 @@ class WeightedPriorityRearrangement(BaseRearrangementPolicy):
         for event in queue:
             event.waiting_time = current_time - event.arrival_time
 
-        if len(queue) >= FIXED_THRESHOLD:
+        # Proactive trigger: start rearranging before queue reaches threshold
+        if len(queue) > FIXED_THRESHOLD - 2:
             queue.sort(
                 key=lambda e: compute_priority(e, self.weights),
                 reverse=True

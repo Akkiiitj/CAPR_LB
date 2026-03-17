@@ -5,4 +5,5 @@ def compute_priority(event, weights):
         + weights["wait"] * event.waiting_time
         + weights["resource"] * event.resource_requirement
         + weights["business"] * event.business_priority_level
+        + 0.05 * event.waiting_time  # Starvation prevention
     )
