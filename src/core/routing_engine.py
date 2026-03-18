@@ -18,7 +18,22 @@ class RoutingEngine:
             if queue:
                 # STEP 4: Proactive load prediction
                 predicted_load = self.load_predictor.predict()
-                
+
+                # --- AUTO SCALING POLICY ---
+                max_servers = 6
+
+                if predicted_load > self.load_threshold and len(servers) < max_servers:
+                    from src.core.server import Server
+                    new_server = Server(len(servers))
+                    servers.append(new_server)
+                    print(f"[AUTO SCALE] Added Server {new_server.id} at time {env.now}")
+                    
+                min_servers = 3
+
+                if predicted_load < self.load_threshold / 2 and len(servers) > min_servers:
+                    removed = servers.pop()
+                    print(f"[SCALE DOWN] Removed Server {removed.id} at time {env.now}")   
+                      
                 # Rearrange if predicted load is high (proactive)
                 if self.load_predictor.is_overloaded(self.load_threshold - 2):
                     self.rearrangement_policy.rearrange(queue, env.now)
