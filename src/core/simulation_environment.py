@@ -13,6 +13,7 @@ class SimulationEnvironment:
 
     def event_producer(self, env, queue):
         i = 0
+        MAX_EVENTS = 200
         while True:
             yield env.timeout(random.expovariate(self.arrival_rate))
 
@@ -34,9 +35,13 @@ class SimulationEnvironment:
         queue = []
         servers = [Server(i) for i in range(NUM_SERVERS)]
 
+        queue_history = []   # 🔥 NEW
+
         env.process(self.event_producer(env, queue))
         env.process(self.routing_engine.run(env, queue, servers, self.logs))
 
-        env.run(until=SIM_TIME)
+        while env.now < SIM_TIME:
+            queue_history.append(len(queue))   # 🔥 TRACK QUEUE
+            env.step()
 
-        return self.logs, queue
+        return self.logs, queue, queue_history   # 🔥 RETURN 3 VALUES
