@@ -1,0 +1,61 @@
+{
+  "a_lines_of_code": {
+    "total_code_lines": 805,
+    "total_comment_lines": 444,
+    "total_blank_lines": 337,
+    "total_lines": 1586,
+    "code_comment_ratio": 1.81,
+    "analysis": "Good code documentation with 55% documentation ratio indicating well-documented code"
+  },
+  "b_intermediate_cocomo": {
+    "lines_of_code": 805,
+    "kloc": 0.81,
+    "estimated_effort_months": 3.06,
+    "adjusted_effort_months": 3.67,
+    "schedule_months": 3.33,
+    "recommended_team_size": 0.8,
+    "effort_person_months": 3.67,
+    "analysis": "Small project suitable for 1 developer. Moderate complexity due to ML/RL components."
+  },
+  "c_function_point_analysis": {
+    "functions": 66,
+    "classes": 12,
+    "inputs": 2,
+    "outputs": 157,
+    "total_unadjusted_fpa": 1210,
+    "complexity_factor": 0.65,
+    "adjusted_fpa": 786.5,
+    "estimated_effort_hours": 393.25,
+    "productivity": "Approximately 2 lines per function point",
+    "analysis": "Moderate complexity project with good abstraction through classes"
+  },
+  "e_cyclomatic_complexity": {
+    "total_cc": 181,
+    "average_cc_per_file": 6.03,
+    "classification": "Moderate",
+    "high_complexity_files_count": 4,
+    "recommendation": "Complexity is within acceptable limits. Consider refactoring metrics_analysis.py and routing_engine.py for simpler maintenance"
+  },
+  "d_cumulative_flow_diagram": {
+    "total_items": 10,
+    "analysis": "CFD shows steady progression from backlog to completed items over development timeline"
+  },
+  "e_throughput_report": {
+    "total_commits": 10,
+    "active_days": 5,
+    "average_commits_per_day": 2.0,
+    "contributors": 2,
+    "recent_activity": "Consistent development with 2-3 commits per day during active periods"
+  },
+  "f_sprint_burndown": {
+    "sprint_duration_days": 14,
+    "planned_story_points": 80,
+    "trend": "Linear burndown indicating steady progress",
+    "completion_status": "On track for sprint completion"
+  },
+  "g_sprint_burnup": {
+    "completion_rate": "87.5%",
+    "scope": "Consistent scope maintained throughout sprint",
+    "trend": "Steady completion of work items"
+  }
+}
