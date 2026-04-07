@@ -1,0 +1,9 @@
+{
+  "simulation_days": 30,
+  "total_metrics_collected": 8639,
+  "max_queue_depth": 13,
+  "avg_queue_depth": 1.895242504919551,
+  "max_servers_needed": 0,
+  "spike_events": 12361,
+  "holidays": 2
+}

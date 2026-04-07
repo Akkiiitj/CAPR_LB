@@ -1,0 +1,258 @@
+# Quick Reference: Python Codebase Analysis
+
+## Files Generated
+1. **PROJECT_STRUCTURE_ANALYSIS.md** - Detailed markdown with all classes, methods, and descriptions
+2. **PYTHON_FILES_ANALYSIS.json** - Structured JSON format for programmatic access
+3. **PYTHON_FILES_QUICK_SUMMARY.txt** - This summary
+
+## Module Breakdown (30 Python Files)
+
+### Core Simulation (`src/core/` - 4 files)
+- **Event** - Task entity with deadline, priority, resource requirements
+- **Server** - Processing unit that executes events, tracks job queue
+- **RoutingEngine** - Main decision loop: load prediction → scaling → routing
+- **SimulationEnvironment** - SimPy wrapper for event generation and execution
+
+### Load Balancing (`src/balancing/` - 2 files)
+- **BaseBalancer** - Abstract interface for server selection
+- **LeastLoadedBalancer** - Selects server with minimum job queue
+
+### Predictive Models (`src/models/` - 2 files)
+- **LinearServerPredictor** - Trains/deploys linear regression for server count prediction
+  - Features: temporal (hour sin/cos, weekday), queue depth, resource utilization
+- **IntegratedPredictor** - Two-stage pipeline: temporal features → RPS → servers
+  - Uses pre-trained sklearn models loaded from disk
+
+### Queue Management (`src/policies/` - 3 files)
+- **BaseRearrangementPolicy** - Abstract interface
+- **WeightedPriorityRearrangement** - Sorts queue by weighted priority when overloaded
+- **SpikeAwarePriorityPolicy** - Detects spikes, applies priority-based ordering during peaks
+
+### Reinforcement Learning (`src/rl/` - 3 files)
+- **QLearningAgent** - Basic Q-Learning: state=(queue_len, imbalance), 2 actions
+- **SimpleQLearningAgent** - Simple variant: state=(queue_bucket), 2 actions (ADD/REMOVE)
+- **EnhancedQLearningAgent** - Advanced: 4D state space (load, queue, servers, spike), 4 actions
+
+### Orchestration (`src/orchestration/` - 3 files)
+- **ProactiveOrchestrator** - Ensemble coordinator: combines linear model + QL agent + load predictor
+- **UpdatedProactiveOrchestrator** - Uses IntegratedPredictor for pre-trained model pipeline
+- **MultiHorizonOrchestrator** - Multi-scale planning (daily at 6AM, hourly, real-time 10-min lookahead)
+
+### Utilities (`src/utils/` - 3 files)
+- **LoadPredictor** - Simple moving average-based load prediction
+- **AdvancedLoadPredictor** - Advanced: temporal patterns + spike detection + probability forecasting
+- **priority_utils** - compute_priority() function for weighted task prioritization
+
+### Experiments (`experiments/` - 5 main files)
+- **run_full_system_build.py** - End-to-end pipeline: simulate → train models → test orchestrator
+- **run_experiments.py** - Comprehensive testing: 3 modes × 8 arrival rates × weight sets
+- **test_integration.py** - Validates pre-trained models, demonstrates predictions
+- **advanced_simulation.py** - 30-day realistic simulation with holidays, spikes, time-of-day patterns
+- **compare_ql_models.py** - Side-by-side comparison: SimpleQL vs EnhancedQL decisions
+
+### Test Suite (`tests/` - ~15 files)
+- **unit/** - Load prediction, system overload, priority policy tests
+- **system/** - Breaking point, SLA compliance, scaling behavior tests
+- **performance/** - Mode comparison, RL learning curves, scalability tests
+
+---
+
+## Key Concepts
+
+### State Representations
+| Agent | State | Description |
+|-------|-------|-------------|
+| QLearningAgent | (queue_len//5, imbalance//2) | Discretized queue and load imbalance |
+| SimpleQLearningAgent | queue_bucket (0-4) | 5-state queue depth classification |
+| EnhancedQLearningAgent | (load_0-9, queue_0-9, servers_0-9, spike_0-3) | 10×10×10×4 multi-dimensional |
+
+### Action Spaces
+| Agent | Actions | Description |
+|-------|---------|-------------|
+| Basic | 2 | least_loaded_balancer vs random_server |
+| Simple | 2 | add_server vs remove_server |
+| Enhanced | 4 | add_server, remove_server, rearrange_queue, do_nothing |
+
+### Prediction Models
+1. **LinearServerPredictor** - Trained on historical metrics
+2. **IntegratedPredictor** - 2-stage: temporal_features → RPS_model → servers_model
+3. **AdvancedLoadPredictor** - Pattern-based: baseline × time_factor × day_factor
+4. **MultiHorizonOrchestrator** - Multi-level: 24h daily plan + hourly alerts + 10-min lookahead
+
+---
+
+## Data Flow Examples
+
+### Scenario 1: Baseline Mode
+```
+Events → Queue → RoutingEngine
+         ↓ (routing_engine.run)
+      LeastLoadedBalancer → Server
+         ↓
+    No RL, no rearrangement
+```
+
+### Scenario 2: Threshold Mode + Rearrangement
+```
+Events → Queue → RoutingEngine
+         ↓ (check if overloaded)
+      WeightedPriorityRearrangement (sorts queue)
+         ↓
+      LeastLoadedBalancer → Server
+```
+
+### Scenario 3: Full RL Mode
+```
+Events → Queue → RoutingEngine
+         ↓ (prediction)
+    AdvancedLoadPredictor → Spike detected?
+         ↓ yes
+    SpikeAwarePriorityPolicy (rearranges)
+         ↓
+    EnhancedQLearningAgent (chooses action)
+         ↓
+    Auto-scale or server select
+         ↓
+    Server → Reward calculation → Agent update
+```
+
+### Scenario 4: Proactive Orchestration
+```
+Current State (RPS, servers, queue) 
+    ↓
+IntegratedPredictor (10 min ahead forecast)
+    ↓
+Predict future RPS/servers
+    ↓
+Compare: future vs current
+    ↓
+Decision: ADD/REMOVE/REARRANGE/MAINTAIN/EMERGENCY_SCALE
+    ↓
+SystemAction → Implement change
+```
+
+---
+
+## Training/Deployment Workflow
+
+1. **Data Collection Phase**
+   - Run `advanced_simulation.py` for 30 days with realistic patterns
+   - Collects: timestamps, queue depths, server counts, response times
+
+2. **Model Training Phase**
+   - Train `LinearServerPredictor` on historical metrics
+   - Pre-train RPS and Server models (external, loaded by IntegratedPredictor)
+   - Results: pickle files to be loaded by IntegratedPredictor
+
+3. **Testing Phase**
+   - `run_experiments.py` tests all combinations
+   - `test_integration.py` validates pre-trained models
+   - `compare_ql_models.py` compares agent strategies
+
+4. **Deployment Phase**
+   - `UpdatedProactiveOrchestrator` uses pre-trained models
+   - `MultiHorizonOrchestrator` manages multi-scale planning
+   - Real-time decisions via `RoutingEngine` with loaded models
+
+---
+
+## Configuration
+- **FIXED_THRESHOLD** - Queue depth trigger for rearrangement
+- **NUM_SERVERS** - Initial server count (typically 3-6)
+- **SIM_TIME** - Simulation duration (time units)
+- **SERVICE_TIME** - Server processing time range
+- **WEIGHT_SETS** - Priority calculation weights (deadline, exec, wait, resource, business)
+
+---
+
+## Class Hierarchy
+
+```
+SimulationEnvironment
+├── RoutingEngine (mode: baseline|threshold|rl)
+│   ├── BaseBalancer
+│   │   └── LeastLoadedBalancer
+│   ├── BaseRearrangementPolicy
+│   │   ├── WeightedPriorityRearrangement
+│   │   └── SpikeAwarePriorityPolicy
+│   └── [QL Agent] (if mode=rl)
+│       ├── QLearningAgent (simple 2-action)
+│       ├── SimpleQLearningAgent (2-action)
+│       └── EnhancedQLearningAgent (4-action)
+
+ProactiveOrchestrator
+├── IntegratedPredictor
+│   ├── RPS Model (pre-trained)
+│   └── Server Model (pre-trained)
+├── EnhancedQLearningAgent
+├── SpikeAwarePriorityPolicy
+└── AdvancedLoadPredictor
+
+MultiHorizonOrchestrator
+├── IntegratedPredictor (daily/hourly)
+└── SpikeAwarePriorityPolicy
+```
+
+---
+
+## Entry Points
+
+### For Testing
+```python
+# Basic experiment
+from experiments.run_experiments import main
+main()  # Runs all combinations
+
+# Integration test
+from experiments.test_integration import *
+test_model_loading()
+test_basic_prediction()
+test_hourly_forecast()
+
+# Model comparison
+from experiments.compare_ql_models import compare_decision
+compare_decision("High Load Scenario", queue=15, load=50, servers=3, spike_prob=0.8)
+```
+
+### For Simulation
+```python
+# Realistic 30-day simulation
+from experiments.advanced_simulation import RealisticDemandSimulation
+sim = RealisticDemandSimulation(days_to_simulate=30, spike_probability=0.15)
+results = sim.run_simulation(num_servers=15)
+
+# With routing engine
+from src.core.simulation_environment import SimulationEnvironment
+from src.core.routing_engine import RoutingEngine
+engine = RoutingEngine(policy, balancer, mode="rl")
+env = SimulationEnvironment(arrival_rate=5.0, routing_engine=engine)
+logs, queue, history = env.run()
+```
+
+### For Predictions
+```python
+# Pre-trained models
+from src.models.integrated_predictor import IntegratedPredictor
+predictor = IntegratedPredictor()
+result = predictor.predict_full_pipeline(datetime.now(), is_holiday=False)
+print(f"Predicted servers: {result['predicted_servers']}")
+
+# Or use orchestrator
+from src.orchestration.updated_orchestrator import UpdatedProactiveOrchestrator
+orch = UpdatedProactiveOrchestrator()
+action, details = orch.get_decision(current_rps=50, current_servers=5, queue_depth=10)
+print(f"Decision: {action}")
+```
+
+---
+
+## Performance Metrics Tracked
+
+- **Response Time** - End-to-end latency (arrival to completion)
+- **Throughput** - Events processed per time unit
+- **Queue Depth** - Tasks waiting in queue
+- **P99 Response Time** - 99th percentile latency
+- **Server Utilization** - Active servers / max available
+- **Crash Flag** - 1 if queue exceeds 100 (system overload)
+- **SLA Compliance** - Tasks meeting deadline requirements
+- **Spike Detection Accuracy** - Correct spike predictions

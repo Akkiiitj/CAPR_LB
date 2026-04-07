@@ -1,0 +1,737 @@
+{
+  "project_structure": {
+    "root": "c:\\Users\\PC\\Desktop\\CAPR_LB2\\CAPR_LB",
+    "analysis_date": "2024",
+    "total_files": 30,
+    
+    "src_core": {
+      "event.py": {
+        "classes": [
+          {
+            "name": "Event",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(event_id, arrival_time, deadline, exec_time, resource, business)",
+                "description": "Initializes event with task metadata: ID, arrival time, deadline, estimated execution time, resource requirement, and business priority level"
+              }
+            ],
+            "attributes": [
+              "id", "arrival_time", "deadline_remaining", "estimated_execution_time",
+              "resource_requirement", "business_priority_level", "waiting_time", "start_time", "finish_time"
+            ]
+          }
+        ]
+      },
+      
+      "server.py": {
+        "classes": [
+          {
+            "name": "Server",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(server_id)",
+                "description": "Creates server instance with unique ID and empty job queue"
+              },
+              {
+                "name": "process",
+                "signature": "(env, event, log_store, agent=None, state=None, action=None, queue=None, servers=None)",
+                "description": "SimPy process that executes an event on the server with random service time, logs completion, and optionally updates Q-Learning agent with reward signal"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "routing_engine.py": {
+        "classes": [
+          {
+            "name": "RoutingEngine",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(rearrangement_policy, balancer, agent=None, mode='baseline')",
+                "description": "Initializes routing engine with load balancer, optional rearrangement policy, optional RL agent, and operational mode (baseline/threshold/rl)"
+              },
+              {
+                "name": "run",
+                "signature": "(env, queue, servers, log_store)",
+                "description": "Main event routing loop handling: load prediction, auto-scaling (with cooldown), queue rearrangement on overload, and server selection via balancer or RL agent"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "simulation_environment.py": {
+        "classes": [
+          {
+            "name": "SimulationEnvironment",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(arrival_rate, routing_engine)",
+                "description": "Sets up SimPy simulation environment with specified event arrival rate and routing strategy"
+              },
+              {
+                "name": "event_producer",
+                "signature": "(env, queue)",
+                "description": "Generator that creates events with exponential inter-arrival times and random task attributes (deadline, exec time, resource, priority)"
+              },
+              {
+                "name": "run",
+                "signature": "()",
+                "description": "Executes simulation until SIM_TIME, tracks queue depth history, returns (logs, remaining_queue, queue_history) tuple"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    "src_balancing": {
+      "base_balancer.py": {
+        "classes": [
+          {
+            "name": "BaseBalancer",
+            "type": "Abstract",
+            "methods": [
+              {
+                "name": "select_server",
+                "signature": "(servers, event)",
+                "description": "Abstract method for selecting target server for event"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "least_loaded_balancer.py": {
+        "classes": [
+          {
+            "name": "LeastLoadedBalancer(BaseBalancer)",
+            "methods": [
+              {
+                "name": "select_server",
+                "signature": "(servers, event)",
+                "description": "Returns server with minimum job queue length using min() with lambda key function"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    "src_models": {
+      "linear_server_predictor.py": {
+        "classes": [
+          {
+            "name": "LinearServerPredictor",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(model_type='ridge', alpha=1.0)",
+                "description": "Initializes linear regression predictor with choice of Linear/Ridge/Lasso and regularization strength"
+              },
+              {
+                "name": "engineer_features",
+                "signature": "(df)",
+                "description": "Extracts 13 temporal and statistical features: hour sin/cos, day-of-week sin/cos, weekday flag, holiday flag, day-of-month, queue depth, resource utilization, moving averages (5 and 15 periods), queue volatility"
+              },
+              {
+                "name": "create_training_data",
+                "signature": "(df, target_column='servers_active', test_size=0.2, random_state=42)",
+                "description": "Engineers features, splits data into train/test sets, returns X_train, X_test, y_train, y_test with feature names"
+              },
+              {
+                "name": "train",
+                "signature": "(df, target_column='servers_active', verbose=True)",
+                "description": "Trains model on data, scales features, computes train/test RMSE/MAE/R² metrics, stores training statistics"
+              },
+              {
+                "name": "predict_servers_needed",
+                "signature": "(timestamp, queue_depth, resource_utilization, is_holiday=False, historical_data=None)",
+                "description": "Predicts optimal server count for given time and load conditions, clamps result to [1, 100] range"
+              },
+              {
+                "name": "predict_batch",
+                "signature": "(df)",
+                "description": "Batch prediction for multiple rows, applies feature engineering and model scaling"
+              },
+              {
+                "name": "get_feature_importance",
+                "signature": "()",
+                "description": "Returns model coefficients as feature importance dictionary"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "integrated_predictor.py": {
+        "classes": [
+          {
+            "name": "IntegratedPredictor",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(rps_model_path=None, server_model_path=None)",
+                "description": "Initializes by loading pre-trained RPS and Server models from disk using default Windows paths"
+              },
+              {
+                "name": "_load_models",
+                "signature": "()",
+                "description": "Loads both RPS and Server pickle models, handles errors gracefully, sets is_loaded flag"
+              },
+              {
+                "name": "_load_pickle_file",
+                "signature": "(filepath)",
+                "description": "Loads pickle file with fallback strategies: tries joblib first, then standard pickle, then latin1 encoding"
+              },
+              {
+                "name": "get_temporal_features",
+                "signature": "(timestamp=None, is_holiday=False)",
+                "description": "Extracts 5 temporal features for YEARLY model: hour (0-23), day_of_year (1-365), day_of_week (0-6), is_weekend (0-1), is_holiday (0-1)"
+              },
+              {
+                "name": "predict_rps",
+                "signature": "(timestamp=None, is_holiday=False)",
+                "description": "Two-stage: extract temporal features → predict RPS (requests per second) using pre-trained model, ensures positive output"
+              },
+              {
+                "name": "predict_servers",
+                "signature": "(rps)",
+                "description": "Predicts servers needed for given RPS using pre-trained Server model, rounds up to minimum 1"
+              },
+              {
+                "name": "predict_full_pipeline",
+                "signature": "(timestamp=None, is_holiday=False)",
+                "description": "Complete 2-stage prediction pipeline: temporal features → RPS → Servers, returns dict with confidence estimate and statistics"
+              },
+              {
+                "name": "_update_statistics",
+                "signature": "(rps, servers)",
+                "description": "Updates running statistics: average RPS/servers, maximum RPS/servers, prediction count"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    "src_policies": {
+      "base_rearrangement_policy.py": {
+        "classes": [
+          {
+            "name": "BaseRearrangementPolicy",
+            "type": "Abstract",
+            "methods": [
+              {
+                "name": "rearrange",
+                "signature": "(queue, current_time)",
+                "description": "Abstract method for queue rearrangement policy"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "weighted_priority_rearrangement.py": {
+        "classes": [
+          {
+            "name": "WeightedPriorityRearrangement(BaseRearrangementPolicy)",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(weights)",
+                "description": "Initializes with priority weight configuration dictionary"
+              },
+              {
+                "name": "rearrange",
+                "signature": "(queue, current_time)",
+                "description": "Updates event waiting times, when queue depth exceeds proactive threshold (FIXED_THRESHOLD - 2), sorts by weighted priority score"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "spike_aware_rearrangement.py": {
+        "classes": [
+          {
+            "name": "SpikeAwarePriorityPolicy",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(spike_threshold=0.7, deadline_weight=0.4, priority_weight=0.3, efficiency_weight=0.3)",
+                "description": "Initializes policy with spike detection threshold and normalized priority weights"
+              },
+              {
+                "name": "detect_spike",
+                "signature": "(queue_depth, max_servers, spike_predictor=None)",
+                "description": "Detects spike state using either ratio-based threshold (queue/servers) or prediction callback, tracks spike transitions"
+              },
+              {
+                "name": "calculate_priority_score",
+                "signature": "(event, current_time, spike_mode=True)",
+                "description": "Computes priority combining deadline urgency (0-1), business priority (0-1), and resource efficiency (0-1) with mode-dependent weighting"
+              },
+              {
+                "name": "rearrange_queue",
+                "signature": "(queue, current_time, max_servers=10, spike_predictor=None)",
+                "description": "During spikes: sorts queue by priority score (descending); during normal periods: maintains FIFO order"
+              },
+              {
+                "name": "get_next_task",
+                "signature": "(queue, current_time, max_servers=10, spike_predictor=None)",
+                "description": "Returns (next_event, was_rearranged) tuple with optional spike-triggered rearrangement"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    "src_rl": {
+      "q_learning_agent.py": {
+        "classes": [
+          {
+            "name": "QLearningAgent",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "()",
+                "description": "Initializes Q-table, sets alpha=0.1, gamma=0.9, epsilon=0.2"
+              },
+              {
+                "name": "get_state",
+                "signature": "(queue_len, imbalance)",
+                "description": "Discretizes queue length and server imbalance into state tuples"
+              },
+              {
+                "name": "choose_action",
+                "signature": "(state)",
+                "description": "Epsilon-greedy action selection: 0=use least-loaded balancer, 1=random server"
+              },
+              {
+                "name": "update",
+                "signature": "(state, action, reward, next_state)",
+                "description": "Q-learning value update: Q(s,a) += α[r + γ*max(Q(s',a')) - Q(s,a)]"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "simple_q_learning_agent.py": {
+        "classes": [
+          {
+            "name": "SimpleQLearningAgent",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(alpha=0.1, gamma=0.9, epsilon=0.1)",
+                "description": "Initializes with learning parameters and defaultdict Q-table for 2 actions (ADD, REMOVE)"
+              },
+              {
+                "name": "get_state",
+                "signature": "(queue_length)",
+                "description": "Maps queue length to 5-state buckets: 0=empty, 1=low(1-5), 2=medium(6-10), 3=high(11-20), 4=very high(21+)"
+              },
+              {
+                "name": "choose_action",
+                "signature": "(state, training=True)",
+                "description": "Epsilon-greedy selection: 0=ADD_SERVER, 1=REMOVE_SERVER"
+              },
+              {
+                "name": "update_q_value",
+                "signature": "(state, action, reward, next_state)",
+                "description": "Standard Q-learning update rule with learning rate α and discount γ"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "enhanced_q_learning_agent.py": {
+        "classes": [
+          {
+            "name": "EnhancedQLearningAgent",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(alpha=0.1, gamma=0.95, epsilon=0.2, epsilon_decay=0.995, min_epsilon=0.05)",
+                "description": "Initializes multi-dimensional Q-Learning agent with 4 discrete action space and epsilon decay"
+              },
+              {
+                "name": "discretize_state",
+                "signature": "(predicted_load, queue_length, active_servers, spike_probability)",
+                "description": "Converts continuous values to discrete buckets: load(0-9), queue(0-9), servers(0-9), spike(0-3) = 10x10x10x4 state space"
+              },
+              {
+                "name": "get_state",
+                "signature": "(predicted_load, queue_length, active_servers, spike_probability=0.0)",
+                "description": "Creates state tuple by discretizing all input dimensions"
+              },
+              {
+                "name": "choose_action",
+                "signature": "(state, training=True)",
+                "description": "Epsilon-greedy selection from 4 actions: 0=add_server, 1=remove_server, 2=rearrange_queue, 3=do_nothing"
+              },
+              {
+                "name": "update_q_value",
+                "signature": "(state, action, reward, next_state, done=False)",
+                "description": "Q-learning update with terminal state handling: Q(s,a) += α[r + γ*max(Q(s',a')) - Q(s,a)]"
+              },
+              {
+                "name": "calculate_reward",
+                "signature": "(queue_length, response_time, servers_used, max_servers, sla_met=True, action=None)",
+                "description": "Multi-factor reward: minimizes queue(-0.5), latency(-RT/100), over-provisioning(-2 if util<30%), SLA compliance(+5 if met), action-specific bonuses/penalties"
+              },
+              {
+                "name": "train_step",
+                "signature": "(current_state, action, reward, ...)",
+                "description": "Single training iteration for agent"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    "src_orchestration": {
+      "proactive_orchestrator.py": {
+        "enums": [
+          {
+            "name": "SystemAction",
+            "values": ["ADD_SERVERS", "REMOVE_SERVERS", "REARRANGE_QUEUE", "SCALE_DOWN", "MAINTAIN", "EMERGENCY_SCALING"]
+          }
+        ],
+        "classes": [
+          {
+            "name": "ProactiveOrchestrator",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(linear_predictor, q_learning_agent, rearrangement_policy, load_predictor, lookahead_window=10, confidence_threshold=0.7)",
+                "description": "Initializes ensemble orchestrator combining linear model predictions, Q-Learning decisions, and load prediction signals"
+              },
+              {
+                "name": "predict_future_load",
+                "signature": "(timestamp, is_holiday=False, minutes_ahead=None)",
+                "description": "Predicts system load N minutes into future using time-based temporal patterns"
+              },
+              {
+                "name": "get_ensemble_prediction",
+                "signature": "(timestamp, current_queue_depth, current_servers_active, max_servers, is_holiday=False)",
+                "description": "Combines 3 prediction methods: linear model (50%), current servers (30%), spike probability (20%) with confidence calculation"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "updated_orchestrator.py": {
+        "enums": [
+          {
+            "name": "SystemAction",
+            "values": ["ADD_SERVERS", "REMOVE_SERVERS", "REARRANGE_QUEUE", "SCALE_DOWN", "MAINTAIN", "EMERGENCY_SCALING"]
+          }
+        ],
+        "classes": [
+          {
+            "name": "UpdatedProactiveOrchestrator",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(integrated_predictor=None, q_learning_agent=None, rearrangement_policy=None, lookahead_window=10, confidence_threshold=0.7)",
+                "description": "Initializes orchestrator using pre-trained integrated predictor (RPS → Servers models)"
+              },
+              {
+                "name": "get_temporal_state",
+                "signature": "(timestamp=None, is_holiday=False)",
+                "description": "Returns temporal features for current predictions"
+              },
+              {
+                "name": "predict_future_rps",
+                "signature": "(minutes_ahead=None)",
+                "description": "Predicts RPS at future time N minutes from now"
+              },
+              {
+                "name": "predict_future_servers",
+                "signature": "(minutes_ahead=None)",
+                "description": "Predicts servers needed N minutes ahead using full pipeline"
+              },
+              {
+                "name": "get_decision",
+                "signature": "(current_rps, current_servers, max_servers, queue_depth=0, timestamp=None, is_holiday=False)",
+                "description": "Makes proactive decision comparing current vs future predicted state with trend analysis and confidence calculation"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "multi_horizon_orchestrator.py": {
+        "enums": [
+          {
+            "name": "DecisionTimescale",
+            "values": ["IMMEDIATE (10-min lookahead)", "HOURLY (next hour)", "DAILY", "WEEKLY"]
+          }
+        ],
+        "classes": [
+          {
+            "name": "MultiHorizonOrchestrator",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(lookahead_minutes=10)",
+                "description": "Initializes multi-scale orchestrator with predictor and policy"
+              },
+              {
+                "name": "generate_daily_plan",
+                "signature": "(target_date=None)",
+                "description": "Generates 24-hour capacity forecast with peak identification, spike windows, and operational recommendations (call at 6 AM)"
+              },
+              {
+                "name": "_identify_spike_windows",
+                "signature": "(hourly_data)",
+                "description": "Finds consecutive hours of peak demand (3+ consecutive peaks)"
+              },
+              {
+                "name": "_generate_daily_recommendations",
+                "signature": "(hourly_data)",
+                "description": "Creates operational actions (pre-scale timing, server counts, reasoning messages)"
+              },
+              {
+                "name": "hourly_checkpoint",
+                "signature": "(current_servers)",
+                "description": "Hourly decision point for next-hour predictions and recommendations"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    
+    "src_utils": {
+      "load_predictor.py": {
+        "classes": [
+          {
+            "name": "LoadPredictor",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(window=5)",
+                "description": "Initializes simple moving average predictor with configurable window size"
+              },
+              {
+                "name": "moving_average",
+                "signature": "(history=None)",
+                "description": "Calculates moving average of queue lengths over window, returns 0 if empty"
+              },
+              {
+                "name": "add_measurement",
+                "signature": "(queue_length)",
+                "description": "Records new queue length measurement to history"
+              },
+              {
+                "name": "predict",
+                "signature": "()",
+                "description": "Returns current load prediction (moving average of recent measurements)"
+              },
+              {
+                "name": "is_overloaded",
+                "signature": "(threshold)",
+                "description": "Returns True if predicted load exceeds specified threshold"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "advanced_load_predictor.py": {
+        "classes": [
+          {
+            "name": "AdvancedLoadPredictor",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(window=10, spike_threshold=1.5)",
+                "description": "Initializes with moving average window and spike detection threshold, includes time-of-day and day-of-week multipliers"
+              },
+              {
+                "name": "add_measurement",
+                "signature": "(queue_length, timestamp=None)",
+                "description": "Records timestamped load measurement for pattern analysis"
+              },
+              {
+                "name": "moving_average",
+                "signature": "(window=None)",
+                "description": "Calculates moving average of recent queue lengths"
+              },
+              {
+                "name": "get_baseline_load",
+                "signature": "()",
+                "description": "Returns baseline load from extended historical average"
+              },
+              {
+                "name": "get_time_factor",
+                "signature": "(hour)",
+                "description": "Returns demand multiplier for hour of day: night=0.3, morning=0.8, business=1.2, evening=0.9, late=0.4"
+              },
+              {
+                "name": "get_day_factor",
+                "signature": "(day_of_week, is_holiday=False)",
+                "description": "Returns demand multiplier by day: weekday=normal, weekend=0.5, holiday=0.3"
+              },
+              {
+                "name": "predict_load",
+                "signature": "(timestamp=None, is_holiday=False)",
+                "description": "Predicts load using baseline * time_factor * day_factor"
+              },
+              {
+                "name": "detect_spike",
+                "signature": "(current_load, minutes_back=15)",
+                "description": "Detects anomalous spikes: returns (is_spike, magnitude) where spike_magnitude > 1.5x baseline"
+              },
+              {
+                "name": "predict_spike_probability",
+                "signature": "(lookahead_minutes=10)",
+                "description": "Predicts spike probability in next N minutes based on recent spike frequency"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "priority_utils.py": {
+        "functions": [
+          {
+            "name": "compute_priority",
+            "signature": "(event, weights)",
+            "description": "Weighted priority calculation: deadline_weight*(1/deadline) + exec_weight*exec_time + wait_weight*wait_time + resource_weight*resource + business_weight*priority + 0.05*wait_time(starvation prevention)"
+          }
+        ]
+      }
+    },
+    
+    "experiments": {
+      "run_full_system_build.py": {
+        "functions": [
+          {
+            "name": "step_1_generate_simulation_data",
+            "signature": "(output_dir='data/')",
+            "description": "Generates 30-day realistic simulation with holidays and demand spikes, exports metrics to CSV and summary JSON, prints statistics"
+          }
+        ]
+      },
+      
+      "run_experiments.py": {
+        "functions": [
+          {
+            "name": "main",
+            "signature": "()",
+            "description": "Comprehensive experiment runner: tests 3 modes × 8 arrival rates × multiple weight sets, collects metrics (response time, p99, throughput, crash flags), exports to results/final_comparison.csv"
+          }
+        ]
+      },
+      
+      "test_integration.py": {
+        "functions": [
+          {
+            "name": "print_section",
+            "signature": "(title)",
+            "description": "Prints formatted section header with title"
+          },
+          {
+            "name": "test_model_loading",
+            "signature": "()",
+            "description": "Verifies RPS and Server models load correctly from disk, checks is_loaded flag"
+          },
+          {
+            "name": "test_basic_prediction",
+            "signature": "()",
+            "description": "Tests 2-stage prediction pipeline with example timestamp, shows RPS and server predictions with confidence"
+          },
+          {
+            "name": "test_hourly_forecast",
+            "signature": "()",
+            "description": "Generates 24-hour predictions and recomm…"
+          }
+        ]
+      },
+      
+      "advanced_simulation.py": {
+        "classes": [
+          {
+            "name": "RealisticDemandSimulation",
+            "methods": [
+              {
+                "name": "__init__",
+                "signature": "(days_to_simulate=30, base_arrival_rate=5.0, spike_multiplier=3.0, spike_probability=0.15)",
+                "description": "Initializes realistic simulation with configured holidays list, base demand, spike parameters"
+              },
+              {
+                "name": "add_holidays",
+                "signature": "(dates)",
+                "description": "Registers custom holiday dates for demand reduction"
+              },
+              {
+                "name": "is_holiday",
+                "signature": "(timestamp)",
+                "description": "Checks if timestamp falls on registered holiday"
+              },
+              {
+                "name": "get_time_of_day_multiplier",
+                "signature": "(hour)",
+                "description": "Returns demand multiplier: morning=0.6, business=1.3, evening=1.0, night=0.4"
+              },
+              {
+                "name": "get_day_of_week_multiplier",
+                "signature": "(day_of_week)",
+                "description": "Returns day-based multiplier: weekdays=normal, Friday=0.85, weekend={0.5}"
+              },
+              {
+                "name": "run_simulation",
+                "signature": "(num_servers)",
+                "description": "Executes month-long event-driven simulation collecting load and response time metrics"
+              },
+              {
+                "name": "export_metrics_to_csv",
+                "signature": "(filepath)",
+                "description": "Exports collected metrics to CSV file for analysis"
+              },
+              {
+                "name": "get_summary",
+                "signature": "()",
+                "description": "Returns simulation statistics dict with days, metric count, queue depths, spike events, holidays"
+              }
+            ]
+          }
+        ]
+      },
+      
+      "compare_ql_models.py": {
+        "functions": [
+          {
+            "name": "print_header",
+            "signature": "(title)",
+            "description": "Prints comparison section header"
+          },
+          {
+            "name": "print_subheader",
+            "signature": "(title)",
+            "description": "Prints subsection divider"
+          },
+          {
+            "name": "compare_decision",
+            "signature": "(scenario_name, queue, load, servers, spike_prob, max_servers=10)",
+            "description": "Compares SimpleQLearningAgent vs EnhancedQLearningAgent decisions for scenario: shows state, action, confidence, all action scores"
+          }
+        ]
+      }
+    }
+  }
+}

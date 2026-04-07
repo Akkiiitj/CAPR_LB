@@ -1,0 +1,48 @@
+{
+  "model_type": "ridge",
+  "is_trained": true,
+  "feature_names": [
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "is_weekday",
+    "is_holiday",
+    "day_of_month",
+    "queue_depth",
+    "resource_utilization",
+    "queue_depth_ma5",
+    "queue_depth_ma15",
+    "resource_util_ma5",
+    "queue_depth_std"
+  ],
+  "training_stats": {
+    "train_rmse": 0.0,
+    "test_rmse": 0.0,
+    "train_mae": 0.0,
+    "test_mae": 0.0,
+    "train_r2": 1.0,
+    "test_r2": 1.0,
+    "n_samples": 8639,
+    "n_features": 13,
+    "model_type": "ridge"
+  },
+  "shutdown_threshold": 0.3,
+  "spinup_threshold": 0.85,
+  "intercept": 0.0,
+  "feature_importance": {
+    "hour_sin": 0.0,
+    "hour_cos": 0.0,
+    "dow_sin": 0.0,
+    "dow_cos": 0.0,
+    "is_weekday": 0.0,
+    "is_holiday": 0.0,
+    "day_of_month": 0.0,
+    "queue_depth": 0.0,
+    "resource_utilization": 0.0,
+    "queue_depth_ma5": 0.0,
+    "queue_depth_ma15": 0.0,
+    "resource_util_ma5": 0.0,
+    "queue_depth_std": 0.0
+  }
+}

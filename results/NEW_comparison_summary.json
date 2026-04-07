@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-04-07T23:49:28.646584",
+  "baseline_stats": {
+    "avg_response_mean": 3.615073731967736,
+    "avg_response_min": 2.742217853840385,
+    "avg_response_max": 4.725254995420899,
+    "p99_response_mean": 5.4226105979516035,
+    "throughput_mean": 7.362499999999999,
+    "max_queue_mean": 12.299999999999999
+  },
+  "improved_stats": {
+    "avg_response_mean": 3.1120325160489983,
+    "avg_response_min": 2.5563703236914033,
+    "avg_response_max": 3.648867086287416,
+    "p99_response_mean": 4.668048774073497,
+    "throughput_mean": 7.583374999999998,
+    "max_queue_mean": 6.1499999999999995
+  },
+  "improvement_percentage": {
+    "avg_response": 13.915102518391098,
+    "p99_response": 13.915102518391109,
+    "queue_reduction": 50.0
+  },
+  "total_scenarios": 16,
+  "load_levels_tested": [
+    2,
+    4,
+    6,
+    8,
+    9,
+    10,
+    11,
+    12
+  ]
+}
